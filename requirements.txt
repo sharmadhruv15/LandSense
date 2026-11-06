@@ -1,0 +1,8 @@
+flask
+pillow
+numpy
+torch
+torchvision
+scipy
+matplotlib
+h5py

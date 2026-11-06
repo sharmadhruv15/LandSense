@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏔️ Himalayan Landslide Detection</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); min-height: 100vh; padding: 15px; }
+        .dashboard { max-width: 1800px; margin: 0 auto; background: white; border-radius: 20px; box-shadow: 0 30px 90px rgba(0,0,0,0.5); overflow: hidden; display: grid; grid-template-columns: 1fr 500px; min-height: 92vh; }
+        .map-section { position: relative; background: #0a0a0a; }
+        .map-header { position: absolute; top: 0; left: 0; right: 0; background: linear-gradient(135deg, #1a1a2e, #16213e); color: white; padding: 18px 25px; z-index: 1000; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .map-header h2 { font-size: 18px; display: flex; align-items: center; gap: 10px; }
+        .control-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.3s; }
+        .control-btn:hover { background: rgba(255,255,255,0.2); transform: translateY(-1px); }
+        #map { width: 100%; height: 100%; min-height: 650px; }
+        .instructions { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); background: rgba(26,26,46,0.95); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 1000; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .sidebar { background: #f8f9fa; padding: 25px; overflow-y: auto; border-left: 3px solid #e9ecef; display: flex; flex-direction: column; }
+        .sidebar-header { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #e9ecef; }
+        .sidebar-header h3 { color: #2c3e50; font-size: 20px; margin-bottom: 6px; }
+        .sidebar-header p { color: #7f8c8d; font-size: 13px; }
+        .mode-tabs { display: flex; margin-bottom: 15px; border-radius: 10px; overflow: hidden; border: 2px solid #dee2e6; }
+        .mode-tab { flex: 1; padding: 10px 6px; text-align: center; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.3s; background: white; color: #7f8c8d; border: none; }
+        .mode-tab.active { background: #2c3e50; color: white; }
+        .mode-tab:not(.active):hover { background: #ecf0f1; }
+        .upload-panel { display: none; }
+        .upload-panel.active { display: block; }
+        .upload-box { border: 2px dashed #bdc3c7; padding: 15px; text-align: center; border-radius: 10px; margin-bottom: 12px; background: white; }
+        .upload-box:hover { border-color: #3498db; }
+        .upload-box p { font-size: 12px; color: #95a5a6; margin-bottom: 8px; }
+        .upload-box input { font-size: 13px; width: 100%; }
+        .btn-analyze { width: 100%; padding: 11px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.3s; color: white; margin-bottom: 6px; }
+        .btn-rgb  { background: linear-gradient(135deg, #27ae60, #2ecc71); }
+        .btn-h5   { background: linear-gradient(135deg, #2980b9, #3498db); }
+        .btn-analyze:hover { transform: translateY(-1px); opacity: 0.92; }
+        .mode-info { padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; line-height: 1.5; border-left: 4px solid; }
+        .mode-info.blue  { background: #eaf4fd; border-color: #3498db; color: #2471a3; }
+        .mode-info.green { background: #eafaf1; border-color: #27ae60; color: #1e8449; }
+        .analysis-card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border: 2px solid #e9ecef; }
+        .analysis-card h4 { color: #2c3e50; margin-bottom: 12px; font-size: 16px; }
+        .risk-display { text-align: center; padding: 16px; border-radius: 10px; margin: 10px 0; }
+        .risk-level { font-size: 26px; font-weight: bold; margin-bottom: 4px; }
+        .risk-score { font-size: 13px; color: #7f8c8d; margin-bottom: 8px; }
+        .risk-bar-bg { height: 10px; background: #ecf0f1; border-radius: 5px; overflow: hidden; }
+        .risk-bar-fill { height: 100%; border-radius: 5px; transition: width 0.8s ease; }
+        .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; color: #555; background: #f8f9fa; padding: 10px; border-radius: 8px; margin: 10px 0; }
+        .details-grid span { display: flex; flex-direction: column; }
+        .details-grid strong { color: #2c3e50; font-size: 11px; margin-bottom: 2px; }
+        .recommendation { padding: 12px; border-radius: 8px; border-left: 4px solid; margin: 12px 0; }
+        .rec-moderate { background: #fff8e1; border-color: #f1c40f; }
+        .rec-moderate p { color: #856404; }
+        .rec-high  { background: #fdf0e0; border-color: #e67e22; }
+        .rec-high p { color: #784212; }
+        .rec-vhigh { background: #fdecea; border-color: #c0392b; }
+        .rec-vhigh p { color: #641e16; }
+        .rec-low   { background: #eafaf1; border-color: #27ae60; }
+        .rec-low p { color: #1e8449; }
+        .recommendation p { font-size: 13px; line-height: 1.5; }
+        .badge-14 { display: inline-block; background: #2980b9; color: white; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
+        .meta-info { font-size: 12px; color: #95a5a6; margin-bottom: 10px; line-height: 1.6; }
+        .result-images h5 { margin-bottom: 8px; color: #2c3e50; font-size: 13px; margin-top: 12px; }
+        .result-images img { max-width: 100%; border-radius: 8px; border: 2px solid #ddd; margin-bottom: 8px; display: block; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0%{transform:rotate(0deg)}100%{transform:rotate(360deg)} }
+        .loading-text { text-align: center; color: #666; font-size: 13px; margin-top: 8px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+
+    <!-- MAP -->
+    <div class="map-section">
+        <div class="map-header">
+            <h2>🗺️ Live Interactive Risk Map</h2>
+            <div>
+                <button class="control-btn" onclick="clearAllDrawings()">🗑️ Clear</button>
+            </div>
+        </div>
+        <div id="map"></div>
+        <div class="instructions">
+            <span>🖱️</span> Draw a rectangle on the map, or upload a file on the right panel
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3>📊 AI Analysis Panel</h3>
+            <p>Choose a mode and upload a file to start risk analysis.</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="mode-tabs">
+            <button class="mode-tab active" id="tab-rgb" onclick="switchMode('rgb', this)">🌄 RGB Image</button>
+            <button class="mode-tab"        id="tab-h5"  onclick="switchMode('h5',  this)">📡 H5 Satellite</button>
+            <button class="mode-tab"        id="tab-map" onclick="switchMode('map', this)">🗺️ Draw on Map</button>
+        </div>
+
+        <!-- RGB Panel -->
+        <div class="upload-panel active" id="panel-rgb">
+            <div class="mode-info green">
+                <strong>RGB Mode</strong> — Upload any satellite/aerial photo (PNG/JPG).<br>
+                Uses U-Net + heuristic fusion + TTA. Good for quick field screening.
+            </div>
+            <div class="upload-box">
+                <p>📷 Satellite / aerial image</p>
+                <input type="file" id="rgbInput" accept="image/png,image/jpeg,image/jpg">
+            </div>
+            <button class="btn-analyze btn-rgb" onclick="analyzeRGB()">🔍 Analyze RGB Image</button>
+        </div>
+
+        <!-- H5 Panel -->
+        <div class="upload-panel" id="panel-h5">
+            <div class="mode-info blue">
+                <strong>H5 Mode — Most Accurate</strong><br>
+                Upload a Landslide4Sense .h5 file. All 14 bands used including
+                NIR, SAR-VV, SAR-VH and Slope. Exactly what the model was trained on.
+            </div>
+            <div class="upload-box">
+                <p>📡 Landslide4Sense .h5 file</p>
+                <input type="file" id="h5Input" accept=".h5,.hdf5">
+            </div>
+            <button class="btn-analyze btn-h5" onclick="analyzeH5()">🚀 Run Full 14-Band Analysis</button>
+        </div>
+
+        <!-- Map Draw Panel -->
+        <div class="upload-panel" id="panel-map">
+            <div class="mode-info green">
+                <strong>Map Draw Mode</strong><br>
+                Use the ▬ rectangle tool on the map to select any area.
+                It will be captured and analyzed automatically.
+            </div>
+            <p style="color:#95a5a6; font-size:13px; text-align:center; padding:20px 0;">
+                Draw a rectangle on the satellite map →
+            </p>
+        </div>
+
+        <!-- Results card -->
+        <div class="analysis-card" id="analysis-panel">
+            <h4>📍 Waiting for Input</h4>
+            <div style="text-align:center; color:#7f8c8d; padding:30px 15px;">
+                <div style="font-size:42px; margin-bottom:12px;">🏔️</div>
+                <p style="font-size:13px;">Select a mode above and upload a file to start analysis.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+<script>
+// ── Map ───────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true, attributionControl: false })
+              .setView([33.7, 75.5], 7);
+
+const satLayer  = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Esri', crossOrigin: true });
+const cityLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'OSM', crossOrigin: true });
+satLayer.addTo(map);
+L.control.layers({ "Satellite": satLayer, "Street Map": cityLayer }, null, { position: 'topleft' }).addTo(map);
+L.control.scale({ position: 'bottomleft' }).addTo(map);
+
+const drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+const drawControl = new L.Control.Draw({
+    position: 'topright',
+    draw: { polygon: false, polyline: false, circle: false, marker: false, circlemarker: false,
+            rectangle: { shapeOptions: { color: '#e74c3c', fillOpacity: 0.1, weight: 2 } } },
+    edit: { featureGroup: drawnItems, remove: true }
+});
+map.addControl(drawControl);
+
+// ── Mode tabs ─────────────────────────────────────────────────────────────
+function switchMode(mode, btn) {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.upload-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + mode).classList.add('active');
+}
+
+// ── Loading ───────────────────────────────────────────────────────────────
+function showLoading(msg) {
+    document.getElementById('analysis-panel').innerHTML = `
+        <h4>📍 Processing...</h4>
+        <div class="loader"></div>
+        <p class="loading-text">${msg}</p>`;
+}
+
+// ── Colour helpers ────────────────────────────────────────────────────────
+const RISK_COL = { 'VERY HIGH':'#c0392b','HIGH':'#e67e22','MODERATE':'#e6b800','LOW':'#27ae60' };
+const RISK_BG  = { 'VERY HIGH':'#fdecea','HIGH':'#fdf0e0','MODERATE':'#fff8e1','LOW':'#eafaf1' };
+const REC_CLS  = { 'VERY HIGH':'rec-vhigh','HIGH':'rec-high','MODERATE':'rec-moderate','LOW':'rec-low' };
+const BAR_COL  = s => s >= 65 ? '#c0392b' : s >= 45 ? '#e67e22' : s >= 25 ? '#f1c40f' : '#27ae60';
+
+// ── Render ────────────────────────────────────────────────────────────────
+function renderResults(data) {
+    const panel = document.getElementById('analysis-panel');
+    if (data.error) {
+        panel.innerHTML = `<h4 style="color:#e74c3c;">❌ Error</h4><p style="font-size:13px;color:#555;">${data.error}</p>`;
+        return;
+    }
+
+    const ia    = data.image_analysis || {};
+    const is14  = (ia.bands_used || '').includes('14/14');
+    const col   = RISK_COL[data.risk_level] || '#27ae60';
+    const bg    = RISK_BG[data.risk_level]  || '#eafaf1';
+    const rCls  = REC_CLS[data.risk_level]  || 'rec-low';
+    const barC  = BAR_COL(data.risk_score);
+
+    const details = is14
+        ? `<span><strong>Bands</strong>${ia.bands_used||'14/14'}</span>
+           <span><strong>NIR Mean</strong>${ia.nir_mean??'—'}</span>
+           <span><strong>SAR-VV</strong>${ia.sar_vv_mean??'—'}</span>
+           <span><strong>Slope</strong>${ia.slope_mean??'—'}</span>
+           <span><strong>LS Prob</strong>${ia.landslide_probability??'—'}%</span>
+           <span><strong>Model</strong>U-Net + TTA</span>`
+        : `<span><strong>Vegetation</strong>${ia.vegetation_pct??'—'}%</span>
+           <span><strong>Bare Rock</strong>${ia.bare_rock_pct??'—'}%</span>
+           <span><strong>Water</strong>${ia.water_pct??'—'}%</span>
+           <span><strong>Terrain</strong>${ia.terrain||'—'}</span>
+           <span><strong>LS Prob</strong>${ia.landslide_probability??'—'}%</span>
+           <span><strong>Mode</strong>RGB+Heuristic</span>`;
+
+    let html = `
+        <h4>📍 Analysis Results${is14 ? '<span class="badge-14">14-band</span>' : ''}</h4>
+        <div class="risk-display" style="background:${bg}; border:2px solid ${col};">
+            <div class="risk-level" style="color:${col};">${data.risk_level} RISK</div>
+            <div class="risk-score">Risk Score: ${data.risk_score} / 100</div>
+            <div class="risk-bar-bg">
+                <div class="risk-bar-fill" style="width:${Math.min(data.risk_score,100)}%; background:${barC};"></div>
+            </div>
+        </div>
+        <div class="details-grid">${details}</div>
+        <div class="recommendation ${rCls}">
+            <p><strong>Recommendation:</strong> ${data.recommendation}</p>
+        </div>
+        <div class="meta-info">
+            📍 ${data.place}<br>
+            🔬 ${data.factors}
+        </div>
+        <div class="result-images">
+            <h5>Risk Map Overlay</h5>
+            <img src="data:image/png;base64,${data.risk_map}" alt="Risk Map">`;
+
+    if (data.dashboard_map) {
+        html += `<h5>Full Diagnostic Dashboard</h5>
+                 <img src="data:image/png;base64,${data.dashboard_map}" alt="Dashboard">`;
+    }
+    html += `</div>`;
+    panel.innerHTML = html;
+}
+
+// ── API call ──────────────────────────────────────────────────────────────
+async function postFile(fileOrBlob, name) {
+    const fd = new FormData();
+    fd.append('image', fileOrBlob, name);
+    const res  = await fetch('/analyze', { method: 'POST', body: fd });
+    const data = await res.json();
+    renderResults(data);
+}
+
+function analyzeRGB() {
+    const fi = document.getElementById('rgbInput');
+    if (!fi.files.length) { alert('Please select an image file first.'); return; }
+    showLoading('Running U-Net + heuristic fusion on RGB image...');
+    postFile(fi.files[0], fi.files[0].name).catch(e => renderResults({ error: e.message }));
+}
+
+function analyzeH5() {
+    const fi = document.getElementById('h5Input');
+    if (!fi.files.length) { alert('Please select a .h5 file first.'); return; }
+    showLoading('Running full 14-band U-Net inference with TTA...<br>Using NIR · SAR-VV · SAR-VH · Slope bands for maximum accuracy.');
+    postFile(fi.files[0], fi.files[0].name).catch(e => renderResults({ error: e.message }));
+}
+
+// ── Map draw ──────────────────────────────────────────────────────────────
+map.on(L.Draw.Event.CREATED, function(e) {
+    drawnItems.clearLayers();
+    drawnItems.addLayer(e.layer);
+    showLoading('Capturing selected map area and running AI analysis...');
+    setTimeout(() => {
+        const dc = document.querySelector('.leaflet-draw');
+        if (dc) dc.style.display = 'none';
+        html2canvas(document.getElementById('map'), { useCORS: true, allowTaint: false, backgroundColor: null })
+        .then(canvas => {
+            if (dc) dc.style.display = '';
+            const bounds = e.layer.getBounds();
+            const nw = map.latLngToContainerPoint(bounds.getNorthWest());
+            const se = map.latLngToContainerPoint(bounds.getSouthEast());
+            let w = se.x - nw.x, h = se.y - nw.y, ox = nw.x, oy = nw.y;
+            if (w < 0) { w = Math.abs(w); ox = se.x; }
+            if (h < 0) { h = Math.abs(h); oy = se.y; }
+            const s = window.devicePixelRatio || 1;
+            const crop = document.createElement('canvas');
+            crop.width = w * s; crop.height = h * s;
+            crop.getContext('2d').drawImage(canvas, ox*s, oy*s, w*s, h*s, 0, 0, w*s, h*s);
+            crop.toBlob(blob => {
+                postFile(blob, 'map_selection.png').catch(err => renderResults({ error: err.message }));
+            }, 'image/png');
+        })
+        .catch(err => {
+            if (dc) dc.style.display = '';
+            renderResults({ error: 'Map capture failed: ' + err.message });
+        });
+    }, 300);
+});
+
+window.clearAllDrawings = function() {
+    drawnItems.clearLayers();
+    document.getElementById('analysis-panel').innerHTML = `
+        <h4>📍 Waiting for Input</h4>
+        <div style="text-align:center; color:#7f8c8d; padding:30px 15px;">
+            <div style="font-size:42px; margin-bottom:12px;">🏔️</div>
+            <p style="font-size:13px;">Drawings cleared. Upload a file or draw a new area.</p>
+        </div>`;
+};
+</script>
+</body>
+</html>
